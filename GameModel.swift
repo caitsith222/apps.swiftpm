@@ -25,7 +25,7 @@ enum TileType: Int, CaseIterable {
 }
 
 // タイルの位置
-struct Position: Equatable {
+struct Position: Equatable, Hashable {
     let row: Int
     let col: Int
 }
