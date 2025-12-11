@@ -1,20 +1,22 @@
-// swift-tools-version: 5.8
+// swift-tools-version: 5.5
 
 import PackageDescription
+import AppleProductTypes
 
 let package = Package(
     name: "MyApp",
     platforms: [
-        .iOS(.v16)
+        .iOS("15.2")
     ],
     products: [
         .iOSApplication(
             name: "MyApp",
             targets: ["AppModule"],
+            bundleIdentifier: "com.example.MyApp",
             displayVersion: "1.0",
             bundleVersion: "1",
-            appIcon: .placeholder(icon: .cloud),
-            accentColor: .presetColor(.blue),
+            iconAssetName: "AppIcon",
+            accentColorAssetName: "AccentColor",
             supportedDeviceFamilies: [
                 .pad,
                 .phone
