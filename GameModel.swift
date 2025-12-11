@@ -179,11 +179,6 @@ class GameModel: ObservableObject {
                 // マッチがある場合は手数を減らして処理
                 DispatchQueue.main.async {
                     self.movesLeft -= 1
-                    // 手数が0になったかチェック
-                    if self.movesLeft <= 0 && self.score < GameModel.targetScore {
-                        self.isGameOver = true
-                        self.isAnimating = false
-                    }
                 }
                 self.processMatches(matches)
             }
