@@ -1,0 +1,2 @@
+# apps.swiftpm
+game make
