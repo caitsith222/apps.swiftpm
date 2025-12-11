@@ -33,7 +33,7 @@ struct Position: Equatable, Hashable {
 // ゲーム状態を管理
 class GameModel: ObservableObject {
     static let gridSize = 8
-    static let maxMoves = 20
+    static let maxMoves = 5
     static let targetScore = 3000
     static let baseScore = 100  // 3タイル消去の基本点
 

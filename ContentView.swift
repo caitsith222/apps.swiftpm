@@ -77,7 +77,7 @@ struct TitleView: View {
                     HStack {
                         Image(systemName: "hand.tap.fill")
                             .foregroundColor(.green)
-                        Text("残り手数: 20手")
+                        Text("残り手数: 5手")
                             .foregroundColor(.white)
                     }
                 }
@@ -164,7 +164,7 @@ struct GameView: View {
                         Text(String(game.movesLeft))
                             .font(.title2)
                             .fontWeight(.bold)
-                            .foregroundColor(game.movesLeft <= 5 ? .red : .black)
+                            .foregroundColor(game.movesLeft <= 2 ? .red : .black)
                     }
                 }
                 .padding()
