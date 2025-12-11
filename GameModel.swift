@@ -33,8 +33,6 @@ struct Position: Equatable, Hashable {
 // ゲーム状態を管理
 class GameModel: ObservableObject {
     static let gridSize = 8
-    static let maxMoves = 5
-    static let targetScore = 3000
     static let baseScore = 100  // 3タイル消去の基本点
 
     @Published var board: [[TileType?]]
@@ -47,7 +45,18 @@ class GameModel: ObservableObject {
     @Published var matchedPositions: Set<Position> = []  // マッチしたタイルの位置
     @Published var removingPositions: Set<Position> = []  // 消去中のタイルの位置
 
-    init() {
+    var currentStage: Stage?
+    var targetScore: Int = 3000
+    var maxMoves: Int = 5
+
+    init(stage: Stage? = nil) {
+        // ステージ設定を適用
+        if let stage = stage {
+            self.currentStage = stage
+            self.targetScore = stage.targetScore
+            self.maxMoves = stage.maxMoves
+        }
+
         // 初期盤面をランダムに生成（3つ揃いがない状態）
         board = [[TileType?]]()
         for _ in 0..<GameModel.gridSize {
@@ -59,7 +68,7 @@ class GameModel: ObservableObject {
         }
 
         // 手数を初期化
-        movesLeft = GameModel.maxMoves
+        movesLeft = maxMoves
 
         // 初期状態で3つ揃いがあれば消す
         removeInitialMatches()
@@ -324,7 +333,7 @@ class GameModel: ObservableObject {
 
     // ゲーム状態チェック
     private func checkGameState() {
-        if score >= GameModel.targetScore {
+        if score >= targetScore {
             isGameCleared = true
             isGameOver = true
         } else if movesLeft <= 0 {
@@ -344,7 +353,7 @@ class GameModel: ObservableObject {
         }
         removeInitialMatches()
         score = 0
-        movesLeft = GameModel.maxMoves
+        movesLeft = maxMoves
         isGameOver = false
         isGameCleared = false
         selectedPosition = nil

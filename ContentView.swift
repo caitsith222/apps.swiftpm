@@ -1,20 +1,58 @@
 import SwiftUI
 
+enum GameScreen {
+    case title
+    case stageSelect
+    case game
+}
+
 struct ContentView: View {
-    @StateObject private var game = GameModel()
-    @State private var showTitle = true
+    @StateObject private var stageManager = StageManager()
+    @State private var currentScreen: GameScreen = .title
+    @State private var selectedStage: Stage?
+    @State private var game: GameModel?
 
     var body: some View {
         ZStack {
-            if showTitle {
+            switch currentScreen {
+            case .title:
                 TitleView(onStart: {
-                    showTitle = false
+                    currentScreen = .stageSelect
                 })
-            } else {
-                GameView(game: game, onBackToTitle: {
-                    game.resetGame()
-                    showTitle = true
-                })
+            case .stageSelect:
+                StageSelectView(
+                    stageManager: stageManager,
+                    onStageSelected: { stage in
+                        selectedStage = stage
+                        game = GameModel(stage: stage)
+                        currentScreen = .game
+                    },
+                    onBackToTitle: {
+                        currentScreen = .title
+                    }
+                )
+            case .game:
+                if let game = game {
+                    GameView(
+                        game: game,
+                        onBackToTitle: {
+                            currentScreen = .title
+                        },
+                        onBackToStageSelect: {
+                            currentScreen = .stageSelect
+                        },
+                        onNextStage: {
+                            // 次のステージをアンロック
+                            if let currentStage = game.currentStage {
+                                let nextStageNumber = currentStage.number + 1
+                                if nextStageNumber <= Stage.stages.count {
+                                    stageManager.unlockStage(nextStageNumber)
+                                }
+                            }
+                            currentScreen = .stageSelect
+                        }
+                    )
+                }
             }
         }
     }
@@ -118,10 +156,137 @@ struct TitleView: View {
     }
 }
 
+// ステージ選択画面
+struct StageSelectView: View {
+    @ObservedObject var stageManager: StageManager
+    let onStageSelected: (Stage) -> Void
+    let onBackToTitle: () -> Void
+
+    var body: some View {
+        ZStack {
+            // 背景グラデーション
+            LinearGradient(
+                gradient: Gradient(colors: [Color.purple.opacity(0.6), Color.pink.opacity(0.6)]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 30) {
+                // タイトル
+                Text("STAGE SELECT")
+                    .font(.system(size: 48, weight: .bold))
+                    .foregroundColor(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
+                    .padding(.top, 40)
+
+                // ステージ一覧
+                ScrollView {
+                    VStack(spacing: 20) {
+                        ForEach(stageManager.getAvailableStages(), id: \.number) { stage in
+                            StageButton(
+                                stage: stage,
+                                isUnlocked: stage.isUnlocked,
+                                onTap: {
+                                    if stage.isUnlocked {
+                                        onStageSelected(stage)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    .padding()
+                }
+
+                // 戻るボタン
+                Button(action: onBackToTitle) {
+                    HStack {
+                        Image(systemName: "chevron.left")
+                        Text("Back to Title")
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(width: 200)
+                    .background(Color.gray.opacity(0.7))
+                    .cornerRadius(15)
+                }
+                .padding(.bottom, 40)
+            }
+        }
+    }
+}
+
+// ステージボタン
+struct StageButton: View {
+    let stage: Stage
+    let isUnlocked: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack {
+                // ステージ番号
+                Text("STAGE \(stage.number)")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .frame(width: 150, alignment: .leading)
+
+                Spacer()
+
+                // ステージ情報
+                VStack(alignment: .trailing, spacing: 5) {
+                    Text(stage.name)
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    HStack(spacing: 15) {
+                        HStack {
+                            Image(systemName: "target")
+                            Text("\(stage.targetScore)")
+                                .font(.caption)
+                        }
+                        HStack {
+                            Image(systemName: "hand.tap.fill")
+                            Text("\(stage.maxMoves)")
+                                .font(.caption)
+                        }
+                    }
+                    .foregroundColor(.white.opacity(0.9))
+                }
+
+                // ロックアイコン
+                if !isUnlocked {
+                    Image(systemName: "lock.fill")
+                        .foregroundColor(.white.opacity(0.5))
+                        .font(.title2)
+                        .padding(.leading, 10)
+                }
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: isUnlocked ?
+                        [Color.blue.opacity(0.8), Color.purple.opacity(0.8)] :
+                        [Color.gray.opacity(0.5), Color.gray.opacity(0.7)]),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .cornerRadius(15)
+            .shadow(radius: isUnlocked ? 5 : 2)
+        }
+        .disabled(!isUnlocked)
+    }
+}
+
 // ゲーム画面
 struct GameView: View {
     @ObservedObject var game: GameModel
     let onBackToTitle: () -> Void
+    let onBackToStageSelect: () -> Void
+    let onNextStage: () -> Void
 
     var body: some View {
         ZStack {
@@ -130,10 +295,17 @@ struct GameView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 20) {
-                // タイトル
-                Text("Match3 Puzzle")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                // ステージ情報とタイトル
+                VStack(spacing: 5) {
+                    if let stage = game.currentStage {
+                        Text("STAGE \(stage.number) - \(stage.name)")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                    }
+                    Text("Match3 Puzzle")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                }
 
                 // スコアと手数表示
                 HStack(spacing: 40) {
@@ -151,7 +323,7 @@ struct GameView: View {
                         Text("TARGET")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text(String(GameModel.targetScore))
+                        Text(String(game.targetScore))
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundColor(.orange)
@@ -177,15 +349,25 @@ struct GameView: View {
                     .padding()
 
                 // ボタン群
-                HStack(spacing: 20) {
+                HStack(spacing: 15) {
                     Button(action: {
                         game.resetGame()
                     }) {
                         Text("Restart")
                             .font(.headline)
                             .padding()
-                            .frame(width: 140)
+                            .frame(width: 110)
                             .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
+
+                    Button(action: onBackToStageSelect) {
+                        Text("Stages")
+                            .font(.headline)
+                            .padding()
+                            .frame(width: 110)
+                            .background(Color.purple)
                             .foregroundColor(.white)
                             .cornerRadius(10)
                     }
@@ -194,7 +376,7 @@ struct GameView: View {
                         Text("Title")
                             .font(.headline)
                             .padding()
-                            .frame(width: 140)
+                            .frame(width: 110)
                             .background(Color.gray)
                             .foregroundColor(.white)
                             .cornerRadius(10)
@@ -208,9 +390,12 @@ struct GameView: View {
                 GameOverView(
                     isCleared: game.isGameCleared,
                     score: game.score,
+                    hasNextStage: game.currentStage != nil && game.currentStage!.number < Stage.stages.count,
                     onRestart: {
                         game.resetGame()
                     },
+                    onNextStage: onNextStage,
+                    onBackToStageSelect: onBackToStageSelect,
                     onBackToTitle: onBackToTitle
                 )
             }
@@ -337,7 +522,10 @@ struct TileView: View {
 struct GameOverView: View {
     let isCleared: Bool
     let score: Int
+    let hasNextStage: Bool
     let onRestart: () -> Void
+    let onNextStage: () -> Void
+    let onBackToStageSelect: () -> Void
     let onBackToTitle: () -> Void
 
     var body: some View {
@@ -355,12 +543,37 @@ struct GameOverView: View {
                     .foregroundColor(.white)
 
                 VStack(spacing: 15) {
-                    Button(action: onRestart) {
-                        Text("Play Again")
+                    if isCleared && hasNextStage {
+                        Button(action: onNextStage) {
+                            HStack {
+                                Text("Next Stage")
+                                Image(systemName: "chevron.right")
+                            }
                             .font(.title2)
                             .padding()
-                            .frame(width: 200)
-                            .background(isCleared ? Color.green : Color.orange)
+                            .frame(width: 220)
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(15)
+                        }
+                    }
+
+                    Button(action: onRestart) {
+                        Text(isCleared ? "Play Again" : "Retry")
+                            .font(.headline)
+                            .padding()
+                            .frame(width: 220)
+                            .background(isCleared ? Color.blue : Color.orange)
+                            .foregroundColor(.white)
+                            .cornerRadius(15)
+                    }
+
+                    Button(action: onBackToStageSelect) {
+                        Text("Stage Select")
+                            .font(.headline)
+                            .padding()
+                            .frame(width: 220)
+                            .background(Color.purple)
                             .foregroundColor(.white)
                             .cornerRadius(15)
                     }
@@ -369,7 +582,7 @@ struct GameOverView: View {
                         Text("Back to Title")
                             .font(.headline)
                             .padding()
-                            .frame(width: 200)
+                            .frame(width: 220)
                             .background(Color.gray)
                             .foregroundColor(.white)
                             .cornerRadius(15)
