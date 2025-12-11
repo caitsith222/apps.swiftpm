@@ -98,15 +98,22 @@ struct GameBoardView: View {
                     HStack(spacing: 4) {
                         ForEach(0..<GameModel.gridSize, id: \.self) { col in
                             let position = Position(row: row, col: col)
-                            TileView(
-                                tileType: game.board[row][col],
-                                isSelected: game.selectedPosition == position,
-                                isMatched: game.matchedPositions.contains(position),
-                                isRemoving: game.removingPositions.contains(position),
-                                size: tileSize
-                            )
-                            .onTapGesture {
-                                handleTileTap(row: row, col: col)
+                            if let tile = game.board[row][col] {
+                                TileView(
+                                    tileType: tile,
+                                    isSelected: game.selectedPosition == position,
+                                    isMatched: game.matchedPositions.contains(position),
+                                    isRemoving: game.removingPositions.contains(position),
+                                    size: tileSize
+                                )
+                                .onTapGesture {
+                                    handleTileTap(row: row, col: col)
+                                }
+                            } else {
+                                // 空のタイル（nilの場合）
+                                Rectangle()
+                                    .fill(Color.clear)
+                                    .frame(width: tileSize, height: tileSize)
                             }
                         }
                     }

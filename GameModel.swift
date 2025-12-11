@@ -37,7 +37,7 @@ class GameModel: ObservableObject {
     static let targetScore = 3000
     static let baseScore = 100  // 3タイル消去の基本点
 
-    @Published var board: [[TileType]]
+    @Published var board: [[TileType?]]
     @Published var score: Int = 0
     @Published var movesLeft: Int = maxMoves
     @Published var isGameOver: Bool = false
@@ -49,9 +49,9 @@ class GameModel: ObservableObject {
 
     init() {
         // 初期盤面をランダムに生成（3つ揃いがない状態）
-        board = [[TileType]]()
+        board = [[TileType?]]()
         for _ in 0..<GameModel.gridSize {
-            var row = [TileType]()
+            var row = [TileType?]()
             for _ in 0..<GameModel.gridSize {
                 row.append(TileType.random())
             }
@@ -83,43 +83,55 @@ class GameModel: ObservableObject {
 
         // 横方向のマッチを検出
         for row in 0..<GameModel.gridSize {
-            var matchStart = 0
-            for col in 1..<GameModel.gridSize {
-                if board[row][col] != board[row][col - 1] {
-                    if col - matchStart >= 3 {
-                        for i in matchStart..<col {
-                            matches.insert(Position(row: row, col: i))
-                        }
+            var col = 0
+            while col < GameModel.gridSize {
+                guard let currentTile = board[row][col] else {
+                    col += 1
+                    continue
+                }
+
+                var matchLength = 1
+                var checkCol = col + 1
+
+                while checkCol < GameModel.gridSize, board[row][checkCol] == currentTile {
+                    matchLength += 1
+                    checkCol += 1
+                }
+
+                if matchLength >= 3 {
+                    for i in col..<(col + matchLength) {
+                        matches.insert(Position(row: row, col: i))
                     }
-                    matchStart = col
                 }
-            }
-            // 行の最後をチェック
-            if GameModel.gridSize - matchStart >= 3 {
-                for i in matchStart..<GameModel.gridSize {
-                    matches.insert(Position(row: row, col: i))
-                }
+
+                col = checkCol
             }
         }
 
         // 縦方向のマッチを検出
         for col in 0..<GameModel.gridSize {
-            var matchStart = 0
-            for row in 1..<GameModel.gridSize {
-                if board[row][col] != board[row - 1][col] {
-                    if row - matchStart >= 3 {
-                        for i in matchStart..<row {
-                            matches.insert(Position(row: i, col: col))
-                        }
+            var row = 0
+            while row < GameModel.gridSize {
+                guard let currentTile = board[row][col] else {
+                    row += 1
+                    continue
+                }
+
+                var matchLength = 1
+                var checkRow = row + 1
+
+                while checkRow < GameModel.gridSize, board[checkRow][col] == currentTile {
+                    matchLength += 1
+                    checkRow += 1
+                }
+
+                if matchLength >= 3 {
+                    for i in row..<(row + matchLength) {
+                        matches.insert(Position(row: i, col: col))
                     }
-                    matchStart = row
                 }
-            }
-            // 列の最後をチェック
-            if GameModel.gridSize - matchStart >= 3 {
-                for i in matchStart..<GameModel.gridSize {
-                    matches.insert(Position(row: i, col: col))
-                }
+
+                row = checkRow
             }
         }
 
@@ -130,6 +142,12 @@ class GameModel: ObservableObject {
     func swapTiles(from: Position, to: Position) {
         guard !isAnimating else { return }
         guard isAdjacentPosition(from, to) else { return }
+
+        // 両方のタイルが存在することを確認
+        guard board[from.row][from.col] != nil, board[to.row][to.col] != nil else {
+            selectedPosition = nil
+            return
+        }
 
         isAnimating = true
 
@@ -146,7 +164,7 @@ class GameModel: ObservableObject {
             let matches = self.findAllMatches()
 
             if matches.isEmpty {
-                // マッチがない場合は元に戻す
+                // マッチがない場合は元に戻す（手数は減らさない）
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                     guard let self = self else { return }
                     let temp = self.board[from.row][from.col]
@@ -177,15 +195,9 @@ class GameModel: ObservableObject {
         // マッチしたタイルをハイライト表示
         matchedPositions = matches
 
-        // スコア加算
+        // スコア加算：消去数 × 基本点
         let matchCount = matches.count
-        if matchCount == 3 {
-            score += GameModel.baseScore
-        } else if matchCount == 4 {
-            score += GameModel.baseScore * 2
-        } else if matchCount >= 5 {
-            score += GameModel.baseScore * 3
-        }
+        score += matchCount * GameModel.baseScore
 
         // 0.5秒後に消去エフェクト開始
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -202,11 +214,15 @@ class GameModel: ObservableObject {
                 // 落下アニメーション
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
                     self?.applyGravity()
-                    self?.refillBoard()
 
-                    // 連鎖チェック
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                        self?.checkForCascade()
+                    // 補充アニメーション
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                        self?.refillBoard()
+
+                        // 連鎖チェック
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                            self?.checkForCascade()
+                        }
                     }
                 }
             }
@@ -223,31 +239,47 @@ class GameModel: ObservableObject {
         }
     }
 
-    // マッチしたタイルを削除（新しいランダムタイルで置き換え）
+    // マッチしたタイルを削除（nilに設定）
     private func removeMatches(_ matches: Set<Position>) {
         for match in matches {
-            board[match.row][match.col] = TileType.random()
+            board[match.row][match.col] = nil
         }
     }
 
     // 重力適用（タイルを下に落とす）
     private func applyGravity() {
+        // 各列ごとに処理
         for col in 0..<GameModel.gridSize {
-            var emptyRow = GameModel.gridSize - 1
+            // 下から上に向かって、nilでないタイルを配列に集める
+            var tiles = [TileType?]()
             for row in stride(from: GameModel.gridSize - 1, through: 0, by: -1) {
-                if board[row][col] != board[emptyRow][col] {
-                    board[emptyRow][col] = board[row][col]
+                if let tile = board[row][col] {
+                    tiles.append(tile)
                 }
-                emptyRow -= 1
+            }
+
+            // 列を下から埋めていく
+            var writeRow = GameModel.gridSize - 1
+            for tile in tiles {
+                board[writeRow][col] = tile
+                writeRow -= 1
+            }
+
+            // 残りのマスをnilで埋める
+            while writeRow >= 0 {
+                board[writeRow][col] = nil
+                writeRow -= 1
             }
         }
     }
 
-    // 盤面を補充（上から新しいタイルを追加）
+    // 盤面を補充（nilのマスに新しいタイルを追加）
     private func refillBoard() {
         for row in 0..<GameModel.gridSize {
             for col in 0..<GameModel.gridSize {
-                board[row][col] = TileType.random()
+                if board[row][col] == nil {
+                    board[row][col] = TileType.random()
+                }
             }
         }
     }
@@ -264,9 +296,9 @@ class GameModel: ObservableObject {
 
     // ゲームリセット
     func resetGame() {
-        board = [[TileType]]()
+        board = [[TileType?]]()
         for _ in 0..<GameModel.gridSize {
-            var row = [TileType]()
+            var row = [TileType?]()
             for _ in 0..<GameModel.gridSize {
                 row.append(TileType.random())
             }
