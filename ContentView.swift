@@ -21,16 +21,17 @@ struct ContentView: View {
                         Text("SCORE")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text("\(game.score)")
+                        Text(String(game.score))
                             .font(.title2)
                             .fontWeight(.bold)
+                            .foregroundColor(.black)
                     }
 
                     VStack {
                         Text("TARGET")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text("\(GameModel.targetScore)")
+                        Text(String(GameModel.targetScore))
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundColor(.orange)
@@ -40,10 +41,10 @@ struct ContentView: View {
                         Text("MOVES")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text("\(game.movesLeft)")
+                        Text(String(game.movesLeft))
                             .font(.title2)
                             .fontWeight(.bold)
-                            .foregroundColor(game.movesLeft <= 5 ? .red : .primary)
+                            .foregroundColor(game.movesLeft <= 5 ? .red : .black)
                     }
                 }
                 .padding()
@@ -215,7 +216,7 @@ struct GameOverView: View {
                     .font(.system(size: 48, weight: .bold))
                     .foregroundColor(.white)
 
-                Text("Score: \(score)")
+                Text("Score: " + String(score))
                     .font(.title)
                     .foregroundColor(.white)
 

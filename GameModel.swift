@@ -39,7 +39,7 @@ class GameModel: ObservableObject {
 
     @Published var board: [[TileType?]]
     @Published var score: Int = 0
-    @Published var movesLeft: Int = maxMoves
+    @Published var movesLeft: Int = 0
     @Published var isGameOver: Bool = false
     @Published var isGameCleared: Bool = false
     @Published var selectedPosition: Position?
@@ -57,6 +57,9 @@ class GameModel: ObservableObject {
             }
             board.append(row)
         }
+
+        // 手数を初期化
+        movesLeft = GameModel.maxMoves
 
         // 初期状態で3つ揃いがあれば消す
         removeInitialMatches()
@@ -174,7 +177,9 @@ class GameModel: ObservableObject {
                 }
             } else {
                 // マッチがある場合は手数を減らして処理
-                self.movesLeft -= 1
+                DispatchQueue.main.async {
+                    self.movesLeft -= 1
+                }
                 self.processMatches(matches)
                 self.checkGameState()
             }
@@ -193,11 +198,15 @@ class GameModel: ObservableObject {
     // マッチ処理（消去→落下→補充のループ）
     private func processMatches(_ matches: Set<Position>) {
         // マッチしたタイルをハイライト表示
-        matchedPositions = matches
+        DispatchQueue.main.async {
+            self.matchedPositions = matches
+        }
 
         // スコア加算：消去数 × 基本点
         let matchCount = matches.count
-        score += matchCount * GameModel.baseScore
+        DispatchQueue.main.async {
+            self.score += matchCount * GameModel.baseScore
+        }
 
         // 0.5秒後に消去エフェクト開始
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
