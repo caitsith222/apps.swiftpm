@@ -179,9 +179,13 @@ class GameModel: ObservableObject {
                 // マッチがある場合は手数を減らして処理
                 DispatchQueue.main.async {
                     self.movesLeft -= 1
+                    // 手数が0になったかチェック
+                    if self.movesLeft <= 0 && self.score < GameModel.targetScore {
+                        self.isGameOver = true
+                        self.isAnimating = false
+                    }
                 }
                 self.processMatches(matches)
-                self.checkGameState()
             }
 
             self.selectedPosition = nil
@@ -206,31 +210,59 @@ class GameModel: ObservableObject {
         let matchCount = matches.count
         DispatchQueue.main.async {
             self.score += matchCount * GameModel.baseScore
+
+            // スコア更新直後にゲーム状態をチェック
+            self.checkGameState()
+
+            // ゲーム終了条件を満たした場合は、アニメーションを中断して画面を表示
+            if self.isGameOver {
+                self.isAnimating = false
+                self.matchedPositions = []
+                self.removingPositions = []
+                return
+            }
         }
 
         // 0.5秒後に消去エフェクト開始
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self = self else { return }
+
+            // ゲーム終了の場合は処理を中断
+            if self.isGameOver {
+                self.isAnimating = false
+                return
+            }
+
             self.removingPositions = matches
             self.matchedPositions = []
 
             // 0.3秒後にタイル消去
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 guard let self = self else { return }
+
+                // ゲーム終了の場合は処理を中断
+                if self.isGameOver {
+                    self.isAnimating = false
+                    return
+                }
+
                 self.removeMatches(matches)
                 self.removingPositions = []
 
                 // 落下アニメーション
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-                    self?.applyGravity()
+                    guard let self = self, !self.isGameOver else { return }
+                    self.applyGravity()
 
                     // 補充アニメーション
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-                        self?.refillBoard()
+                        guard let self = self, !self.isGameOver else { return }
+                        self.refillBoard()
 
                         // 連鎖チェック
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-                            self?.checkForCascade()
+                            guard let self = self, !self.isGameOver else { return }
+                            self.checkForCascade()
                         }
                     }
                 }
@@ -245,6 +277,8 @@ class GameModel: ObservableObject {
             processMatches(matches)
         } else {
             isAnimating = false
+            // 連鎖終了後に最終的なゲーム状態をチェック
+            checkGameState()
         }
     }
 
