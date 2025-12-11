@@ -2,6 +2,126 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var game = GameModel()
+    @State private var showTitle = true
+
+    var body: some View {
+        ZStack {
+            if showTitle {
+                TitleView(onStart: {
+                    showTitle = false
+                })
+            } else {
+                GameView(game: game, onBackToTitle: {
+                    game.resetGame()
+                    showTitle = true
+                })
+            }
+        }
+    }
+}
+
+// タイトル画面
+struct TitleView: View {
+    let onStart: () -> Void
+
+    var body: some View {
+        ZStack {
+            // 背景グラデーション
+            LinearGradient(
+                gradient: Gradient(colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.6)]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 50) {
+                Spacer()
+
+                // タイトル
+                VStack(spacing: 20) {
+                    Text("マッチ3パズル")
+                        .font(.system(size: 60, weight: .bold))
+                        .foregroundColor(.white)
+                        .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
+
+                    Text("Match 3 Puzzle")
+                        .font(.title2)
+                        .foregroundColor(.white.opacity(0.9))
+                }
+
+                Spacer()
+
+                // ゲーム説明
+                VStack(spacing: 15) {
+                    HStack {
+                        Image(systemName: "arrow.up.arrow.down")
+                            .foregroundColor(.white)
+                        Text("隣接するタイルを入れ替えて")
+                            .foregroundColor(.white)
+                    }
+
+                    HStack {
+                        Image(systemName: "star.fill")
+                            .foregroundColor(.yellow)
+                        Text("3つ以上揃えて消そう！")
+                            .foregroundColor(.white)
+                    }
+
+                    HStack {
+                        Image(systemName: "target")
+                            .foregroundColor(.orange)
+                        Text("目標: 3000点")
+                            .foregroundColor(.white)
+                    }
+
+                    HStack {
+                        Image(systemName: "hand.tap.fill")
+                            .foregroundColor(.green)
+                        Text("残り手数: 20手")
+                            .foregroundColor(.white)
+                    }
+                }
+                .padding()
+                .background(Color.white.opacity(0.2))
+                .cornerRadius(15)
+
+                Spacer()
+
+                // スタートボタン
+                Button(action: onStart) {
+                    HStack {
+                        Image(systemName: "play.fill")
+                        Text("START")
+                            .font(.title)
+                            .fontWeight(.bold)
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 60)
+                    .padding(.vertical, 20)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.green, Color.blue]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(25)
+                    .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
+                }
+                .scaleEffect(1.0)
+                .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: true)
+
+                Spacer()
+            }
+            .padding()
+        }
+    }
+}
+
+// ゲーム画面
+struct GameView: View {
+    @ObservedObject var game: GameModel
+    let onBackToTitle: () -> Void
 
     var body: some View {
         ZStack {
@@ -56,17 +176,29 @@ struct ContentView: View {
                 GameBoardView(game: game)
                     .padding()
 
-                // リセットボタン
-                Button(action: {
-                    game.resetGame()
-                }) {
-                    Text("New Game")
-                        .font(.headline)
-                        .padding()
-                        .frame(width: 200)
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
+                // ボタン群
+                HStack(spacing: 20) {
+                    Button(action: {
+                        game.resetGame()
+                    }) {
+                        Text("Restart")
+                            .font(.headline)
+                            .padding()
+                            .frame(width: 140)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
+
+                    Button(action: onBackToTitle) {
+                        Text("Title")
+                            .font(.headline)
+                            .padding()
+                            .frame(width: 140)
+                            .background(Color.gray)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
                 }
             }
             .padding()
@@ -78,7 +210,8 @@ struct ContentView: View {
                     score: game.score,
                     onRestart: {
                         game.resetGame()
-                    }
+                    },
+                    onBackToTitle: onBackToTitle
                 )
             }
         }
@@ -205,6 +338,7 @@ struct GameOverView: View {
     let isCleared: Bool
     let score: Int
     let onRestart: () -> Void
+    let onBackToTitle: () -> Void
 
     var body: some View {
         ZStack {
@@ -220,14 +354,26 @@ struct GameOverView: View {
                     .font(.title)
                     .foregroundColor(.white)
 
-                Button(action: onRestart) {
-                    Text("Play Again")
-                        .font(.title2)
-                        .padding()
-                        .frame(width: 200)
-                        .background(isCleared ? Color.green : Color.orange)
-                        .foregroundColor(.white)
-                        .cornerRadius(15)
+                VStack(spacing: 15) {
+                    Button(action: onRestart) {
+                        Text("Play Again")
+                            .font(.title2)
+                            .padding()
+                            .frame(width: 200)
+                            .background(isCleared ? Color.green : Color.orange)
+                            .foregroundColor(.white)
+                            .cornerRadius(15)
+                    }
+
+                    Button(action: onBackToTitle) {
+                        Text("Back to Title")
+                            .font(.headline)
+                            .padding()
+                            .frame(width: 200)
+                            .background(Color.gray)
+                            .foregroundColor(.white)
+                            .cornerRadius(15)
+                    }
                 }
             }
             .padding(40)
