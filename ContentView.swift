@@ -97,9 +97,12 @@ struct GameBoardView: View {
                 ForEach(0..<GameModel.gridSize, id: \.self) { row in
                     HStack(spacing: 4) {
                         ForEach(0..<GameModel.gridSize, id: \.self) { col in
+                            let position = Position(row: row, col: col)
                             TileView(
                                 tileType: game.board[row][col],
-                                isSelected: game.selectedPosition == Position(row: row, col: col),
+                                isSelected: game.selectedPosition == position,
+                                isMatched: game.matchedPositions.contains(position),
+                                isRemoving: game.removingPositions.contains(position),
                                 size: tileSize
                             )
                             .onTapGesture {
@@ -133,21 +136,57 @@ struct GameBoardView: View {
 struct TileView: View {
     let tileType: TileType
     let isSelected: Bool
+    let isMatched: Bool
+    let isRemoving: Bool
     let size: CGFloat
 
     var body: some View {
         ZStack {
+            // タイル本体
             RoundedRectangle(cornerRadius: 8)
                 .fill(tileType.color)
                 .frame(width: size, height: size)
                 .shadow(radius: isSelected ? 5 : 2)
                 .scaleEffect(isSelected ? 1.1 : 1.0)
+                .opacity(isRemoving ? 0 : 1.0)
                 .animation(.spring(response: 0.3), value: isSelected)
+                .animation(.easeOut(duration: 0.3), value: isRemoving)
 
+            // 選択時の白枠
             if isSelected {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(Color.white, lineWidth: 3)
                     .frame(width: size, height: size)
+            }
+
+            // マッチ時の光るエフェクト
+            if isMatched {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.white.opacity(0.6))
+                    .frame(width: size, height: size)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.yellow, lineWidth: 4)
+                    )
+                    .scaleEffect(1.2)
+                    .animation(.easeInOut(duration: 0.3).repeatCount(2, autoreverses: true), value: isMatched)
+            }
+
+            // 消去時のパーティクルエフェクト
+            if isRemoving {
+                ZStack {
+                    ForEach(0..<8, id: \.self) { i in
+                        Circle()
+                            .fill(tileType.color)
+                            .frame(width: size * 0.2, height: size * 0.2)
+                            .offset(
+                                x: cos(Double(i) * .pi / 4) * size * 0.6,
+                                y: sin(Double(i) * .pi / 4) * size * 0.6
+                            )
+                            .opacity(0)
+                            .animation(.easeOut(duration: 0.3), value: isRemoving)
+                    }
+                }
             }
         }
     }

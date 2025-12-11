@@ -44,6 +44,8 @@ class GameModel: ObservableObject {
     @Published var isGameCleared: Bool = false
     @Published var selectedPosition: Position?
     @Published var isAnimating: Bool = false
+    @Published var matchedPositions: Set<Position> = []  // マッチしたタイルの位置
+    @Published var removingPositions: Set<Position> = []  // 消去中のタイルの位置
 
     init() {
         // 初期盤面をランダムに生成（3つ揃いがない状態）
@@ -129,27 +131,38 @@ class GameModel: ObservableObject {
         guard !isAnimating else { return }
         guard isAdjacentPosition(from, to) else { return }
 
-        // 交換実行
-        let temp = board[from.row][from.col]
-        board[from.row][from.col] = board[to.row][to.col]
-        board[to.row][to.col] = temp
+        isAnimating = true
 
-        // マッチがあるかチェック
-        let matches = findAllMatches()
+        // スワップアニメーション用に少し待つ
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self = self else { return }
 
-        if matches.isEmpty {
-            // マッチがない場合は元に戻す
-            let temp = board[from.row][from.col]
-            board[from.row][from.col] = board[to.row][to.col]
-            board[to.row][to.col] = temp
-        } else {
-            // マッチがある場合は手数を減らして処理
-            movesLeft -= 1
-            processMatches(matches)
-            checkGameState()
+            // 交換実行
+            let temp = self.board[from.row][from.col]
+            self.board[from.row][from.col] = self.board[to.row][to.col]
+            self.board[to.row][to.col] = temp
+
+            // マッチがあるかチェック
+            let matches = self.findAllMatches()
+
+            if matches.isEmpty {
+                // マッチがない場合は元に戻す
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                    guard let self = self else { return }
+                    let temp = self.board[from.row][from.col]
+                    self.board[from.row][from.col] = self.board[to.row][to.col]
+                    self.board[to.row][to.col] = temp
+                    self.isAnimating = false
+                }
+            } else {
+                // マッチがある場合は手数を減らして処理
+                self.movesLeft -= 1
+                self.processMatches(matches)
+                self.checkGameState()
+            }
+
+            self.selectedPosition = nil
         }
-
-        selectedPosition = nil
     }
 
     // 隣接チェック
@@ -161,7 +174,8 @@ class GameModel: ObservableObject {
 
     // マッチ処理（消去→落下→補充のループ）
     private func processMatches(_ matches: Set<Position>) {
-        isAnimating = true
+        // マッチしたタイルをハイライト表示
+        matchedPositions = matches
 
         // スコア加算
         let matchCount = matches.count
@@ -173,16 +187,28 @@ class GameModel: ObservableObject {
             score += GameModel.baseScore * 3
         }
 
-        // タイル消去
-        removeMatches(matches)
+        // 0.5秒後に消去エフェクト開始
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
+            self.removingPositions = matches
+            self.matchedPositions = []
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.applyGravity()
-            self?.refillBoard()
-
-            // 連鎖チェック
+            // 0.3秒後にタイル消去
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.checkForCascade()
+                guard let self = self else { return }
+                self.removeMatches(matches)
+                self.removingPositions = []
+
+                // 落下アニメーション
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                    self?.applyGravity()
+                    self?.refillBoard()
+
+                    // 連鎖チェック
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                        self?.checkForCascade()
+                    }
+                }
             }
         }
     }
@@ -252,5 +278,8 @@ class GameModel: ObservableObject {
         isGameOver = false
         isGameCleared = false
         selectedPosition = nil
+        matchedPositions = []
+        removingPositions = []
+        isAnimating = false
     }
 }
