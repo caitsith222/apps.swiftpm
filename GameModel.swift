@@ -559,10 +559,14 @@ class GameModel: ObservableObject {
                 }
 
                 // 特殊タイルを生成（マッチを消す前に）
-                self.createSpecialTiles(specialPatterns)
+                let specialTilePositions = self.createSpecialTiles(specialPatterns)
 
-                // マッチしたタイルを消去
-                self.removeMatches(matches)
+                // 特殊タイル生成位置を除外してマッチを消去
+                var matchesToRemove = matches
+                for pos in specialTilePositions {
+                    matchesToRemove.remove(pos)
+                }
+                self.removeMatches(matchesToRemove)
                 self.removingPositions = []
 
                 // 落下アニメーション
@@ -586,8 +590,8 @@ class GameModel: ObservableObject {
         }
     }
 
-    // 特殊タイルを生成
-    private func createSpecialTiles(_ specialPatterns: [Position: SpecialType]) {
+    // 特殊タイルを生成（生成した位置のSetを返す）
+    private func createSpecialTiles(_ specialPatterns: [Position: SpecialType]) -> Set<Position> {
         // 特殊パターンがある位置に特殊タイルを配置
         // 優先順位: レインボー > 爆弾 > ライン爆弾
         var createdPositions = Set<Position>()
@@ -601,7 +605,7 @@ class GameModel: ObservableObject {
             }
         }
 
-        // 爆弾を生成（レインボーがない場所）
+        // 爆弾を生成（レインボーがない場合）
         if createdPositions.isEmpty {
             for (pos, specialType) in specialPatterns where specialType == .bomb {
                 if !createdPositions.contains(pos),
@@ -613,7 +617,7 @@ class GameModel: ObservableObject {
             }
         }
 
-        // ライン爆弾を生成（レインボーと爆弾がない場所）
+        // ライン爆弾を生成（レインボーと爆弾がない場合）
         if createdPositions.isEmpty {
             for (pos, specialType) in specialPatterns where specialType == .horizontalLine || specialType == .verticalLine {
                 if !createdPositions.contains(pos),
@@ -624,6 +628,8 @@ class GameModel: ObservableObject {
                 }
             }
         }
+
+        return createdPositions
     }
 
     // 連鎖チェック

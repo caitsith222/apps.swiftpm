@@ -472,6 +472,7 @@ struct TileView: View {
     let isMatched: Bool
     let isRemoving: Bool
     let size: CGFloat
+    @State private var specialScale: CGFloat = 0.3
 
     var body: some View {
         ZStack {
@@ -485,9 +486,20 @@ struct TileView: View {
                 .animation(.spring(response: 0.3), value: isSelected)
                 .animation(.easeOut(duration: 0.3), value: isRemoving)
 
-            // 特殊タイルのマーク
+            // 特殊タイルのマーク（アニメーション付き）
             if tile.special != .none {
                 SpecialTileOverlay(specialType: tile.special, size: size)
+                    .scaleEffect(specialScale)
+                    .onAppear {
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
+                            specialScale = 1.1
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                specialScale = 1.0
+                            }
+                        }
+                    }
             }
 
             // 選択時の白枠
@@ -536,29 +548,53 @@ struct SpecialTileOverlay: View {
     let size: CGFloat
 
     var body: some View {
-        switch specialType {
-        case .none:
-            EmptyView()
-        case .horizontalLine:
-            Image(systemName: "arrow.left.and.right")
-                .foregroundColor(.white)
-                .font(.system(size: size * 0.4, weight: .bold))
-                .shadow(radius: 2)
-        case .verticalLine:
-            Image(systemName: "arrow.up.and.down")
-                .foregroundColor(.white)
-                .font(.system(size: size * 0.4, weight: .bold))
-                .shadow(radius: 2)
-        case .bomb:
-            Image(systemName: "burst.fill")
-                .foregroundColor(.white)
-                .font(.system(size: size * 0.4, weight: .bold))
-                .shadow(radius: 2)
-        case .rainbow:
-            Image(systemName: "sparkles")
-                .foregroundColor(.white)
-                .font(.system(size: size * 0.4, weight: .bold))
-                .shadow(radius: 2)
+        ZStack {
+            switch specialType {
+            case .none:
+                EmptyView()
+            case .horizontalLine:
+                // 背景の円
+                Circle()
+                    .fill(Color.black.opacity(0.5))
+                    .frame(width: size * 0.6, height: size * 0.6)
+                Image(systemName: "arrow.left.and.right")
+                    .foregroundColor(.white)
+                    .font(.system(size: size * 0.5, weight: .black))
+                    .shadow(color: .black, radius: 3, x: 0, y: 0)
+            case .verticalLine:
+                // 背景の円
+                Circle()
+                    .fill(Color.black.opacity(0.5))
+                    .frame(width: size * 0.6, height: size * 0.6)
+                Image(systemName: "arrow.up.and.down")
+                    .foregroundColor(.white)
+                    .font(.system(size: size * 0.5, weight: .black))
+                    .shadow(color: .black, radius: 3, x: 0, y: 0)
+            case .bomb:
+                // 背景の円
+                Circle()
+                    .fill(Color.black.opacity(0.5))
+                    .frame(width: size * 0.6, height: size * 0.6)
+                Image(systemName: "burst.fill")
+                    .foregroundColor(.orange)
+                    .font(.system(size: size * 0.5, weight: .black))
+                    .shadow(color: .black, radius: 3, x: 0, y: 0)
+            case .rainbow:
+                // 背景の円（グラデーション）
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [.red, .yellow, .green, .blue, .purple]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: size * 0.7, height: size * 0.7)
+                Image(systemName: "star.fill")
+                    .foregroundColor(.white)
+                    .font(.system(size: size * 0.5, weight: .black))
+                    .shadow(color: .black, radius: 3, x: 0, y: 0)
+            }
         }
     }
 }
