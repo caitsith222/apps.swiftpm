@@ -345,8 +345,15 @@ struct GameView: View {
                 .shadow(radius: 5)
 
                 // ゲームボード
-                GameBoardView(game: game)
-                    .padding()
+                ZStack {
+                    GameBoardView(game: game)
+                        .padding()
+
+                    // 連鎖ポップアップ
+                    if game.showChainPopup && game.chainCount >= 2 {
+                        ChainPopupView(chainCount: game.chainCount)
+                    }
+                }
 
                 // ボタン群
                 HStack(spacing: 15) {
@@ -419,7 +426,7 @@ struct GameBoardView: View {
                             let position = Position(row: row, col: col)
                             if let tile = game.board[row][col] {
                                 TileView(
-                                    tileType: tile,
+                                    tile: tile,
                                     isSelected: game.selectedPosition == position,
                                     isMatched: game.matchedPositions.contains(position),
                                     isRemoving: game.removingPositions.contains(position),
@@ -460,7 +467,7 @@ struct GameBoardView: View {
 
 // タイルビュー
 struct TileView: View {
-    let tileType: TileType
+    let tile: Tile
     let isSelected: Bool
     let isMatched: Bool
     let isRemoving: Bool
@@ -470,13 +477,18 @@ struct TileView: View {
         ZStack {
             // タイル本体
             RoundedRectangle(cornerRadius: 8)
-                .fill(tileType.color)
+                .fill(tile.type.color)
                 .frame(width: size, height: size)
                 .shadow(radius: isSelected ? 5 : 2)
                 .scaleEffect(isSelected ? 1.1 : 1.0)
                 .opacity(isRemoving ? 0 : 1.0)
                 .animation(.spring(response: 0.3), value: isSelected)
                 .animation(.easeOut(duration: 0.3), value: isRemoving)
+
+            // 特殊タイルのマーク
+            if tile.special != .none {
+                SpecialTileOverlay(specialType: tile.special, size: size)
+            }
 
             // 選択時の白枠
             if isSelected {
@@ -503,7 +515,7 @@ struct TileView: View {
                 ZStack {
                     ForEach(0..<8, id: \.self) { i in
                         Circle()
-                            .fill(tileType.color)
+                            .fill(tile.type.color)
                             .frame(width: size * 0.2, height: size * 0.2)
                             .offset(
                                 x: cos(Double(i) * .pi / 4) * size * 0.6,
@@ -514,6 +526,72 @@ struct TileView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+// 特殊タイルのオーバーレイ表示
+struct SpecialTileOverlay: View {
+    let specialType: SpecialType
+    let size: CGFloat
+
+    var body: some View {
+        switch specialType {
+        case .none:
+            EmptyView()
+        case .horizontalLine:
+            Image(systemName: "arrow.left.and.right")
+                .foregroundColor(.white)
+                .font(.system(size: size * 0.4, weight: .bold))
+                .shadow(radius: 2)
+        case .verticalLine:
+            Image(systemName: "arrow.up.and.down")
+                .foregroundColor(.white)
+                .font(.system(size: size * 0.4, weight: .bold))
+                .shadow(radius: 2)
+        case .bomb:
+            Image(systemName: "burst.fill")
+                .foregroundColor(.white)
+                .font(.system(size: size * 0.4, weight: .bold))
+                .shadow(radius: 2)
+        case .rainbow:
+            Image(systemName: "sparkles")
+                .foregroundColor(.white)
+                .font(.system(size: size * 0.4, weight: .bold))
+                .shadow(radius: 2)
+        }
+    }
+}
+
+// 連鎖ポップアップ
+struct ChainPopupView: View {
+    let chainCount: Int
+
+    var body: some View {
+        VStack {
+            Text("\(chainCount) CHAIN!")
+                .font(.system(size: 48, weight: .bold))
+                .foregroundColor(.white)
+                .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 5)
+            Text("×\(String(format: "%.1f", calculateMultiplier(chain: chainCount)))")
+                .font(.system(size: 32, weight: .bold))
+                .foregroundColor(.yellow)
+                .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 5)
+        }
+        .padding()
+        .background(Color.black.opacity(0.3))
+        .cornerRadius(20)
+        .scaleEffect(1.2)
+        .animation(.spring(response: 0.3), value: chainCount)
+    }
+
+    private func calculateMultiplier(chain: Int) -> Double {
+        switch chain {
+        case 2: return 1.2
+        case 3: return 1.5
+        case 4: return 2.0
+        case 5: return 2.5
+        default: return 3.0
         }
     }
 }
