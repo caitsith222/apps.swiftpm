@@ -389,6 +389,26 @@ struct GameView: View {
                             .cornerRadius(10)
                     }
                 }
+
+                // デバッグモード切り替えボタン
+                Button(action: {
+                    game.debugMode.toggle()
+                }) {
+                    HStack {
+                        Image(systemName: game.debugMode ? "ant.fill" : "ant")
+                        Text("Debug")
+                    }
+                    .font(.caption)
+                    .padding(8)
+                    .background(game.debugMode ? Color.red.opacity(0.8) : Color.gray.opacity(0.5))
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
+
+                // デバッグパネル
+                if game.debugMode {
+                    DebugPanel(game: game)
+                }
             }
             .padding()
 
@@ -486,6 +506,9 @@ struct TileView: View {
                 .animation(.spring(response: 0.3), value: isSelected)
                 .animation(.easeOut(duration: 0.3), value: isRemoving)
 
+            // 障害物の表示（最優先）
+            ObstacleOverlay(obstacle: tile.obstacle, size: size)
+
             // 特殊タイルのマーク（アニメーション付き）
             if tile.special != .none {
                 SpecialTileOverlay(specialType: tile.special, size: size)
@@ -538,6 +561,66 @@ struct TileView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+// 障害物のオーバーレイ表示
+struct ObstacleOverlay: View {
+    let obstacle: ObstacleType
+    let size: CGFloat
+
+    var body: some View {
+        switch obstacle {
+        case .none:
+            EmptyView()
+
+        case .frozen:
+            // 凍結エフェクト
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.cyan.opacity(0.4))
+                    .frame(width: size, height: size)
+                Image(systemName: "snowflake")
+                    .foregroundColor(.white)
+                    .font(.system(size: size * 0.35, weight: .bold))
+                    .shadow(color: .cyan, radius: 4, x: 0, y: 0)
+            }
+
+        case .chained:
+            // 鎖エフェクト
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.gray.opacity(0.4))
+                    .frame(width: size, height: size)
+                Image(systemName: "lock.fill")
+                    .foregroundColor(.white)
+                    .font(.system(size: size * 0.35, weight: .bold))
+                    .shadow(color: .black, radius: 4, x: 0, y: 0)
+            }
+
+        case .breakable(let hp):
+            // 壊せるブロックエフェクト
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.brown.opacity(0.6))
+                    .frame(width: size, height: size)
+                VStack(spacing: 2) {
+                    Image(systemName: "cube.fill")
+                        .foregroundColor(.white)
+                        .font(.system(size: size * 0.25, weight: .bold))
+                    Text("HP\(hp)")
+                        .foregroundColor(.white)
+                        .font(.system(size: size * 0.2, weight: .bold))
+                }
+                .shadow(color: .black, radius: 3, x: 0, y: 0)
+            }
+
+        case .hole:
+            // 穴（タイル表示しない）
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.black.opacity(0.8))
+                .frame(width: size, height: size)
         }
     }
 }
@@ -629,6 +712,142 @@ struct ChainPopupView: View {
         case 5: return 2.5
         default: return 3.0
         }
+    }
+}
+
+// デバッグパネル
+struct DebugPanel: View {
+    @ObservedObject var game: GameModel
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text("🐛 DEBUG MODE")
+                .font(.headline)
+                .foregroundColor(.red)
+
+            // ゲーム情報
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Chain: \(game.chainCount)")
+                    .font(.caption)
+                Text("Animating: \(game.isAnimating ? "YES" : "NO")")
+                    .font(.caption)
+                Text("Selected: \(game.selectedPosition != nil ? "(\(game.selectedPosition!.row), \(game.selectedPosition!.col))" : "None")")
+                    .font(.caption)
+            }
+            .padding(8)
+            .background(Color.black.opacity(0.2))
+            .cornerRadius(8)
+
+            // 特殊タイル生成ボタン
+            if let pos = game.selectedPosition {
+                Text("Special Tiles at (\(pos.row), \(pos.col))")
+                    .font(.caption)
+                    .foregroundColor(.white)
+
+                HStack(spacing: 8) {
+                    Button(action: {
+                        game.debugCreateSpecialTile(at: pos, type: .horizontalLine)
+                    }) {
+                        Image(systemName: "arrow.left.and.right")
+                            .frame(width: 35, height: 35)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
+                    }
+
+                    Button(action: {
+                        game.debugCreateSpecialTile(at: pos, type: .verticalLine)
+                    }) {
+                        Image(systemName: "arrow.up.and.down")
+                            .frame(width: 35, height: 35)
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
+                    }
+
+                    Button(action: {
+                        game.debugCreateSpecialTile(at: pos, type: .bomb)
+                    }) {
+                        Image(systemName: "burst.fill")
+                            .frame(width: 35, height: 35)
+                            .background(Color.orange)
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
+                    }
+
+                    Button(action: {
+                        game.debugCreateSpecialTile(at: pos, type: .rainbow)
+                    }) {
+                        Image(systemName: "star.fill")
+                            .frame(width: 35, height: 35)
+                            .background(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [.red, .yellow, .green, .blue]),
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
+                    }
+                }
+
+                Text("Obstacles at (\(pos.row), \(pos.col))")
+                    .font(.caption)
+                    .foregroundColor(.white)
+                    .padding(.top, 5)
+
+                HStack(spacing: 8) {
+                    Button(action: {
+                        game.debugSetObstacle(at: pos, obstacle: .frozen)
+                    }) {
+                        Image(systemName: "snowflake")
+                            .frame(width: 35, height: 35)
+                            .background(Color.cyan)
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
+                    }
+
+                    Button(action: {
+                        game.debugSetObstacle(at: pos, obstacle: .chained)
+                    }) {
+                        Image(systemName: "lock.fill")
+                            .frame(width: 35, height: 35)
+                            .background(Color.gray)
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
+                    }
+
+                    Button(action: {
+                        game.debugSetObstacle(at: pos, obstacle: .breakable(hp: 2))
+                    }) {
+                        Text("HP2")
+                            .font(.caption.bold())
+                            .frame(width: 35, height: 35)
+                            .background(Color.brown)
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
+                    }
+
+                    Button(action: {
+                        game.debugSetObstacle(at: pos, obstacle: .none)
+                    }) {
+                        Image(systemName: "xmark")
+                            .frame(width: 35, height: 35)
+                            .background(Color.red.opacity(0.7))
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
+                    }
+                }
+            } else {
+                Text("Select a tile for debug options")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+        }
+        .padding()
+        .background(Color.black.opacity(0.7))
+        .cornerRadius(15)
     }
 }
 

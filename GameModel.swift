@@ -10,18 +10,34 @@ enum SpecialType {
     case rainbow        // レインボー（5個直線消し）
 }
 
-// タイル（通常色 + 特殊タイプ）
+// 障害物の種類
+enum ObstacleType: Equatable {
+    case none           // 障害物なし
+    case breakable(hp: Int)  // 壊せるブロック（HP制）
+    case frozen         // 凍結タイル（スワップ不可、1回のマッチで解除）
+    case chained        // 鎖タイル（スワップ不可、1回のマッチで解除）
+    case hole           // 穴（タイル配置不可）
+}
+
+// タイル（通常色 + 特殊タイプ + 障害物）
 struct Tile: Equatable {
     let type: TileType
     let special: SpecialType
+    var obstacle: ObstacleType
 
-    init(type: TileType, special: SpecialType = .none) {
+    init(type: TileType, special: SpecialType = .none, obstacle: ObstacleType = .none) {
         self.type = type
         self.special = special
+        self.obstacle = obstacle
     }
 
     static func random() -> Tile {
-        Tile(type: TileType.random(), special: .none)
+        Tile(type: TileType.random(), special: .none, obstacle: .none)
+    }
+
+    // 障害物付きタイル
+    static func withObstacle(type: TileType, obstacle: ObstacleType) -> Tile {
+        Tile(type: type, special: .none, obstacle: obstacle)
     }
 }
 
@@ -70,11 +86,26 @@ class GameModel: ObservableObject {
     @Published var removingPositions: Set<Position> = []  // 消去中のタイルの位置
     @Published var chainCount: Int = 0  // 連鎖カウント
     @Published var showChainPopup: Bool = false  // 連鎖ポップアップ表示
+    @Published var debugMode: Bool = false  // デバッグモード
 
     var currentStage: Stage?
     var targetScore: Int = 3000
     var maxMoves: Int = 5
     private var currentChainMultiplier: Double = 1.0
+
+    // デバッグ用：特殊タイルを手動生成
+    func debugCreateSpecialTile(at position: Position, type: SpecialType) {
+        guard var tile = board[position.row][position.col] else { return }
+        tile = Tile(type: tile.type, special: type, obstacle: tile.obstacle)
+        board[position.row][position.col] = tile
+    }
+
+    // デバッグ用：障害物を配置
+    func debugSetObstacle(at position: Position, obstacle: ObstacleType) {
+        guard var tile = board[position.row][position.col] else { return }
+        tile = Tile(type: tile.type, special: tile.special, obstacle: obstacle)
+        board[position.row][position.col] = tile
+    }
 
     init(stage: Stage? = nil) {
         // ステージ設定を適用
@@ -392,6 +423,13 @@ class GameModel: ObservableObject {
             return
         }
 
+        // 凍結または鎖タイルはスワップ不可
+        if fromTile.obstacle == .frozen || fromTile.obstacle == .chained ||
+           toTile.obstacle == .frozen || toTile.obstacle == .chained {
+            selectedPosition = nil
+            return
+        }
+
         isAnimating = true
 
         // レインボータイルとの交換かチェック
@@ -558,6 +596,9 @@ class GameModel: ObservableObject {
                     return
                 }
 
+                // 障害物を処理（凍結・鎖解除、ブロック破壊）
+                self.processObstacles(at: matches)
+
                 // 特殊タイルを生成（マッチを消す前に）
                 let specialTilePositions = self.createSpecialTiles(specialPatterns)
 
@@ -586,6 +627,38 @@ class GameModel: ObservableObject {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // 障害物を処理（破壊・解除）
+    private func processObstacles(at positions: Set<Position>) {
+        for pos in positions {
+            guard var tile = board[pos.row][pos.col] else { continue }
+
+            switch tile.obstacle {
+            case .none:
+                break
+
+            case .breakable(let hp):
+                // HP減少、0になったら破壊
+                if hp > 1 {
+                    tile.obstacle = .breakable(hp: hp - 1)
+                    board[pos.row][pos.col] = tile
+                } else {
+                    // HP 0で破壊（通常タイルに戻す）
+                    tile.obstacle = .none
+                    board[pos.row][pos.col] = tile
+                }
+
+            case .frozen, .chained:
+                // 凍結・鎖を解除
+                tile.obstacle = .none
+                board[pos.row][pos.col] = tile
+
+            case .hole:
+                // 穴は処理不要
+                break
             }
         }
     }
