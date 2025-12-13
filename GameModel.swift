@@ -117,12 +117,20 @@ class GameModel: ObservableObject {
 
         // 初期盤面をランダムに生成（3つ揃いがない状態）
         board = [[Tile?]]()
-        for _ in 0..<GameModel.gridSize {
-            var row = [Tile?]()
-            for _ in 0..<GameModel.gridSize {
-                row.append(Tile.random())
+        for row in 0..<GameModel.gridSize {
+            var rowTiles = [Tile?]()
+            for col in 0..<GameModel.gridSize {
+                // 穴の位置かチェック
+                let position = Position(row: row, col: col)
+                if let stage = stage, stage.boardShape.holes.contains(position) {
+                    // 穴の場合はnilを配置
+                    rowTiles.append(nil)
+                } else {
+                    // 通常タイルを配置
+                    rowTiles.append(Tile.random())
+                }
             }
-            board.append(row)
+            board.append(rowTiles)
         }
 
         // 手数を初期化
@@ -130,6 +138,20 @@ class GameModel: ObservableObject {
 
         // 初期状態で3つ揃いがあれば消す
         removeInitialMatches()
+
+        // ステージの障害物を配置
+        if let stage = stage {
+            applyStageObstacles(stage.obstacles)
+        }
+    }
+
+    // ステージの障害物を配置
+    private func applyStageObstacles(_ obstacles: [ObstaclePlacement]) {
+        for placement in obstacles {
+            guard var tile = board[placement.row][placement.col] else { continue }
+            tile = Tile(type: tile.type, special: tile.special, obstacle: placement.obstacle)
+            board[placement.row][placement.col] = tile
+        }
     }
 
     // 初期盤面の揃いを除去
@@ -748,21 +770,35 @@ class GameModel: ObservableObject {
             // 下から上に向かって、nilでないタイルを配列に集める
             var tiles = [Tile?]()
             for row in stride(from: GameModel.gridSize - 1, through: 0, by: -1) {
+                let pos = Position(row: row, col: col)
+                if isHole(at: pos) {
+                    // 穴はスキップ
+                    continue
+                }
                 if let tile = board[row][col] {
                     tiles.append(tile)
                 }
             }
 
-            // 列を下から埋めていく
+            // 列を下から埋めていく（穴を避けて）
             var writeRow = GameModel.gridSize - 1
             for tile in tiles {
-                board[writeRow][col] = tile
-                writeRow -= 1
+                // 穴をスキップして書き込み位置を探す
+                while writeRow >= 0 && isHole(at: Position(row: writeRow, col: col)) {
+                    writeRow -= 1
+                }
+                if writeRow >= 0 {
+                    board[writeRow][col] = tile
+                    writeRow -= 1
+                }
             }
 
-            // 残りのマスをnilで埋める
+            // 残りのマスをnilで埋める（穴以外）
             while writeRow >= 0 {
-                board[writeRow][col] = nil
+                let pos = Position(row: writeRow, col: col)
+                if !isHole(at: pos) {
+                    board[writeRow][col] = nil
+                }
                 writeRow -= 1
             }
         }
@@ -772,11 +808,22 @@ class GameModel: ObservableObject {
     private func refillBoard() {
         for row in 0..<GameModel.gridSize {
             for col in 0..<GameModel.gridSize {
+                // 穴はスキップ
+                if isHole(at: Position(row: row, col: col)) {
+                    continue
+                }
+
                 if board[row][col] == nil {
                     board[row][col] = Tile.random()
                 }
             }
         }
+    }
+
+    // 指定位置が穴かチェック
+    private func isHole(at position: Position) -> Bool {
+        guard let stage = currentStage else { return false }
+        return stage.boardShape.holes.contains(position)
     }
 
     // ゲーム状態チェック

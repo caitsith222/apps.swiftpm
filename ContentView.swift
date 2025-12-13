@@ -456,10 +456,18 @@ struct GameBoardView: View {
                                     handleTileTap(row: row, col: col)
                                 }
                             } else {
-                                // 空のタイル（nilの場合）
-                                Rectangle()
-                                    .fill(Color.clear)
-                                    .frame(width: tileSize, height: tileSize)
+                                // 空のタイル（nilの場合）- 穴か一時的な空白か判定
+                                if isHole(position: position) {
+                                    // 穴の場合は黒背景
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.black.opacity(0.8))
+                                        .frame(width: tileSize, height: tileSize)
+                                } else {
+                                    // 一時的な空白（落下中）
+                                    Rectangle()
+                                        .fill(Color.clear)
+                                        .frame(width: tileSize, height: tileSize)
+                                }
                             }
                         }
                     }
@@ -482,6 +490,11 @@ struct GameBoardView: View {
             // 1つ目のタイルを選択
             game.selectedPosition = position
         }
+    }
+
+    private func isHole(position: Position) -> Bool {
+        guard let stage = game.currentStage else { return false }
+        return stage.boardShape.holes.contains(position)
     }
 }
 

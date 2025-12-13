@@ -16,8 +16,21 @@
     - 視覚表示: シアンオーバーレイ + 雪の結晶アイコン ❄️
   - **鎖タイル**: スワップ不可、1回のマッチで解除
     - 視覚表示: グレーオーバーレイ + 鍵アイコン 🔒
-  - **穴**: タイル配置不可（将来の拡張用）
+  - **穴**: タイル配置不可、重力・補充処理で自動スキップ
     - 視覚表示: 黒背景
+
+- **ステージ別盤面カスタマイズ**: 各ステージ固有のレイアウトと障害物
+  - **Stage 1 (初級)**: 標準8×8、障害物なし
+  - **Stage 2 (中級)**: 標準8×8、凍結タイル4個配置
+  - **Stage 3 (上級)**: 四隅穴あき、壊せるブロックHP2を4個（中央）
+  - **Stage 4 (超級)**: 中央2×2穴、鎖タイル4個 + 壊せるブロックHP3を4個
+  - **Stage 5 (極級)**: クロス形状（四隅2×2穴）、凍結4個 + 鎖4個 + 壊せるブロックHP3を4個
+
+- **盤面形状システム**: 自由な形状デザイン
+  - `BoardShape.standard`: 通常の8×8グリッド
+  - `BoardShape.cornerHoles`: 四隅に穴（各コーナー2〜3マス）
+  - `BoardShape.centerHole`: 中央2×2の穴
+  - `BoardShape.crossShape`: 十字形状（四隅2×2ずつ穴）
 
 ### Changed
 - **タイルデータ構造**: `Tile(type, special, obstacle)`に拡張
@@ -43,6 +56,14 @@
 - `debugSetObstacle(at:, obstacle:)`: デバッグ用障害物配置
 - `DebugPanel`: デバッグUIコンポーネント
 - `ObstacleOverlay`: 障害物視覚表示コンポーネント
+- `ObstaclePlacement` struct: 障害物配置情報（row, col, obstacle）
+- `BoardShape` struct: 盤面形状定義（穴の位置セット）
+- `Stage.obstacles`: ステージ初期障害物配置
+- `Stage.boardShape`: ステージ盤面形状
+- `applyStageObstacles(_:)`: ステージ障害物を盤面に適用
+- `isHole(at:)`: 指定位置が穴かチェック
+- `applyGravity()`: 穴を考慮した重力処理
+- `refillBoard()`: 穴をスキップした補充処理
 
 ---
 
